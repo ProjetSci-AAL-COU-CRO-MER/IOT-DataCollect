@@ -8,6 +8,8 @@ import threading
 import serial
 import pymongo
 import json
+import time
+import paho.mqtt.client as mqtt
 
 
 # binding information
@@ -17,6 +19,8 @@ FILENAME        = "values.txt"
 LAST_VALUE      = ""
 SERV_BDD_PHY    = ""
 SERV_DASH       = ""
+PORT            = 1883
+IP_MQTT         = "10.0.2.5"
 
 # Listen serial interface
 SERIALPORT = "/dev/ttyACM0"
@@ -40,42 +44,28 @@ def handle():
         ser.writeTimeout = 0     #timeout for write
         print ('Starting Up Serial Monitor')
         try:
-            while 1:
-                data=ser.readLine()
-                print data
+                ser.open()
         except serial.SerialException:
                 print("Serial {} port not available".format(SERIALPORT))
                 exit()
 
 #send UDP data
 def sendUDP():
-    byte_message = bytes(data, "utf-8")
-    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGR)
+    byte_message = bytes("data", "utf-8")
+    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     opened_socket.sendto(byte_message, (SERV_BDD_PHY, UDP_PORT))
 
+# send MQTT Data
+# Callback Function on Connection with MQTT Server
+def on_connect( client, userdata, flags, rc):
+    print ("Connected with Code :" +str(rc))
 
-#class ThreadedUDPRequestHandler(socketserver.BaseRequestHandler):
+# Callback Function on Receiving the Subscribed Topic/Message
+def on_message( client, userdata, msg):
+    # print the message received from the subscribed topic
+    print ( str(msg.payload) )
+ 
 
- #   def handle(self):
-  #      data = self.request[0].strip()
-   #     data = data.decode("utf-8")
-    #    socket = self.request[1]
-     #   current_thread = threading.current_thread()
-      #  print("{}: client: {}, wrote: {}".format(current_thread.name, self.client_address, data))
-       # if data != "":
-        #    sendUARTMessage(data) # Send message through UART
-
-#class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
- #   pass
-
-
-
-#def sendUARTMessage(msg):
- #   ser.write(msg)
-  #  print("Message <" + msg + "> sent to micro-controller." )
-
-
-# Main program logic follows:
 if __name__ == '__main__':
         handle()
         print ('Press Ctrl-C to quit.')
@@ -83,12 +73,28 @@ if __name__ == '__main__':
         #server = ThreadedUDPServer((HOST, UDP_PORT), ThreadedUDPRequestHandler)
         #server_thread = threading.Thread(target=server.serve_forever)
         #server_thread.daemon = True
+        
+        #Communication via mqtt
+        client = mqtt.Client()
+        client.on_connect = on_connect
+        client.on_message = on_message
 
+        # client.username_pw_set("login", "mdp")
+        client.connect(IP_MQTT, PORT, 60)
+        client.loop_start()
         try:
-                server_thread.start()
-                print("Server started at {} port {}".format(HOST, UDP_PORT))
+                while ser.isOpen() : 
+                        time.sleep(2)
+                        if (ser.inWaiting() > 0): # if incoming bytes are waiting 
+                                data_str = ser.read(ser.inWaiting()).decode("utf-8")
+                                print (data_str)
+                                client.publish("sensors",data_str)
+                                print ("Message envoyé")
+
         except (KeyboardInterrupt, SystemExit):
                 server.shutdown()
                 server.server_close()
                 ser.close()
+                client.loop_stop()
+                client.disconnect()
                 exit()
