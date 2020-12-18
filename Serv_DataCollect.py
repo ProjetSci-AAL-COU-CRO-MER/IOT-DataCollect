@@ -23,7 +23,7 @@ PORT            = 1883
 IP_MQTT         = "10.0.2.5"
 
 # Listen serial interface
-SERIALPORT = "/dev/ttyACM0"
+SERIALPORT = "/dev/ttyACM1"
 BAUDRATE = 115200
 ser = serial.Serial()
 
