@@ -20,7 +20,7 @@ LAST_VALUE      = ""
 SERV_BDD_PHY    = ""
 SERV_DASH       = ""
 PORT            = 1883
-IP_MQTT         = "10.0.2.5"
+IP_MQTT         = "164.4.1.5"
 
 # Listen serial interface
 SERIALPORT = "/dev/ttyACM1"
@@ -64,7 +64,20 @@ def on_connect( client, userdata, flags, rc):
 def on_message( client, userdata, msg):
     # print the message received from the subscribed topic
     print ( str(msg.payload) )
- 
+
+def readSerial():
+        data_str =""
+        while(True):
+                tmp = ser.read(1)
+                #print (tmp)
+                tmp = tmp.decode("utf-8")
+                if tmp == '\n':
+                        return data_str
+                elif tmp == " " or tmp == '\r':
+                        pass
+                else:
+                        data_str = data_str + tmp
+
 
 if __name__ == '__main__':
         handle()
@@ -78,22 +91,39 @@ if __name__ == '__main__':
         client = mqtt.Client()
         client.on_connect = on_connect
         client.on_message = on_message
-
-        # client.username_pw_set("login", "mdp")
+        client.username_pw_set("Linux", "Linux1")
         client.connect(IP_MQTT, PORT, 60)
         client.loop_start()
         try:
                 while ser.isOpen() : 
-                        time.sleep(2)
-                        if (ser.inWaiting() > 0): # if incoming bytes are waiting 
-                                data_str = ser.read(ser.inWaiting()).decode("utf-8")
-                                print (data_str)
-                                client.publish("sensors",data_str)
+                        time.sleep(0.5)
+                        data_str = readSerial()
+                        # if (ser.inWaiting() > 0): # if incoming bytes are waiting 
+                        #        data_str = ser.read(ser.inWaiting()).decode("utf-8")
+                        data_str_complete = ""
+                        if "start" in data_str:
+                                #print ("'"+data_str+"'")
+                                while not "end" in data_str:
+                                        time.sleep(0.5)
+                                        data_str = readSerial() 
+                                        if "end" in data_str:
+                                               pass
+                                        elif data_str == '':
+                                                pass
+                                        else:
+                                               data_str = data_str[3:]
+                                               data_str = data_str[:len(data_str)-3]
+                                               data_str_complete = data_str_complete+data_str+" "                                      
+                                
+                                print (data_str_complete)
+                                client.publish("sensors",data_str_complete)
                                 print ("Message envoyé")
+                        else:
+                                pass
 
         except (KeyboardInterrupt, SystemExit):
-                server.shutdown()
-                server.server_close()
+                #server.shutdown()
+                #server.server_close()
                 ser.close()
                 client.loop_stop()
                 client.disconnect()
